@@ -5,7 +5,7 @@ Home: https://github.com/google/glog
 
 Package license: BSD
 
-Feedstock license: BSD
+Feedstock license: BSD 3-Clause
 
 Summary: C++ implementation of the Google logging module.
 
@@ -69,9 +69,15 @@ Terminology
 
 Current build status
 ====================
+
 Linux: [![Circle CI](https://circleci.com/gh/conda-forge/glog-feedstock.svg?style=svg)](https://circleci.com/gh/conda-forge/glog-feedstock)
 OSX: [![TravisCI](https://travis-ci.org/conda-forge/glog-feedstock.svg?branch=master)](https://travis-ci.org/conda-forge/glog-feedstock) 
 Windows: [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/conda-forge/glog-feedstock?svg=True)](https://ci.appveyor.com/project/conda-forge/glog-feedstock/branch/master)
+
+Current release info
+====================
+Version: [![Anaconda-Server Badge](https://anaconda.org/conda-forge/glog/badges/version.svg)](https://anaconda.org/conda-forge/glog)
+Downloads: [![Anaconda-Server Badge](https://anaconda.org/conda-forge/glog/badges/downloads.svg)](https://anaconda.org/conda-forge/glog)
 
 
 Updating glog-feedstock
