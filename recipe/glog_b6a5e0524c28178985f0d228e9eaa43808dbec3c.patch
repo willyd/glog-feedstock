@@ -1,0 +1,1846 @@
+diff --git a/AUTHORS b/AUTHORS
+index ee92be8..8e65410 100644
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -1,2 +1,22 @@
+-opensource@google.com
++# This is the official list of glog authors for copyright purposes.
++# This file is distinct from the CONTRIBUTORS files.
++# See the latter for an explanation.
++#
++# Names should be added to this file as:
++#	Name or Organization <email address>
++# The email address is not required for organizations.
++#
++# Please keep the list sorted.
+ 
++Abhishek Dasgupta <abhi2743@gmail.com>
++Abhishek Parmar <abhishek@orng.net>
++Andy Ying <andy@trailofbits.com>
++Brian Silverman <bsilver16384@gmail.com>
++Google Inc.
++Guillaume Dumont <dumont.guillaume@gmail.com>
++Michael Tanner <michael@tannertaxpro.com>
++MiniLight <MiniLightAR@Gmail.com>
++romange <romange@users.noreply.github.com>
++Sergiu Deitsch <sergiu.deitsch@gmail.com>
++tbennun <tbennun@gmail.com>
++Teddy Reed <teddy@prosauce.org>
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+new file mode 100644
+index 0000000..7ede6e7
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,583 @@
++cmake_minimum_required (VERSION 3.0)
++
++if (POLICY CMP0042)
++  cmake_policy (SET CMP0042 NEW)
++endif (POLICY CMP0042)
++
++if (POLICY CMP0063)
++  cmake_policy (SET CMP0063 NEW)
++endif (POLICY CMP0063)
++
++project (google-glog)
++
++enable_testing ()
++
++set (GLOG_MAJOR_VERSION 0)
++set (GLOG_MINOR_VERSION 3)
++set (GLOG_PATCH_VERSION 4)
++
++set (GLOG_VERSION
++  ${GLOG_MAJOR_VERSION}.${GLOG_MINOR_VERSION}.${GLOG_PATCH_VERSION})
++
++set (CPACK_PACKAGE_NAME glog)
++set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "")
++set (CPACK_PACKAGE_VERSION_MAJOR ${GLOG_MAJOR_VERSION})
++set (CPACK_PACKAGE_VERSION_MINOR ${GLOG_MINOR_VERSION})
++set (CPACK_PACKAGE_VERSION_PATCH ${GLOG_PATCH_VERSION})
++set (CPACK_PACKAGE_VERSION ${GLOG_VERSION})
++
++option (WITH_GFLAGS "Use gflags" ON)
++option (WITH_THREADS "Enable multithreading support" ON)
++
++list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
++
++include (CheckCSourceCompiles)
++include (CheckCXXCompilerFlag)
++include (CheckCXXSourceCompiles)
++include (CheckFunctionExists)
++include (CheckIncludeFile)
++include (CheckIncludeFileCXX)
++include (CheckLibraryExists)
++include (CheckStructHasMember)
++include (CheckSymbolExists)
++include (CheckTypeSize)
++include (CMakePackageConfigHelpers)
++include (CPack)
++include (CTest)
++include (DetermineGflagsNamespace)
++
++set (CMAKE_THREAD_PREFER_PTHREAD 1)
++
++if (WITH_GFLAGS)
++  find_package (gflags)
++
++  if (gflags_FOUND)
++    set (HAVE_LIB_GFLAGS 1)
++    determine_gflags_namespace (gflags_NAMESPACE)
++  endif (gflags_FOUND)
++endif (WITH_GFLAGS)
++
++if (WITH_THREADS)
++  find_package (Threads)
++endif (WITH_THREADS)
++
++check_include_file (dlfcn.h HAVE_DLFCN_H)
++check_include_file (execinfo.h HAVE_EXECINFO_H)
++check_include_file (glob.h HAVE_GLOB_H)
++check_include_file (inttypes.h HAVE_INTTYPES_H)
++check_include_file (libunwind.h HAVE_LIBUNWIND_H)
++check_include_file (memory.h HAVE_MEMORY_H)
++check_include_file (pwd.h HAVE_PWD_H)
++check_include_file (stdint.h HAVE_STDINT_H)
++check_include_file (stdlib.h HAVE_STDLIB_H)
++check_include_file (string.h HAVE_STRING_H)
++check_include_file (strings.h HAVE_STRINGS_H)
++check_include_file (sys/stat.h HAVE_SYS_STAT_H)
++check_include_file (sys/syscall.h HAVE_SYS_SYSCALL_H)
++check_include_file (sys/time.h HAVE_SYS_TIME_H)
++check_include_file (sys/types.h HAVE_SYS_TYPES_H)
++check_include_file (sys/utsname.h HAVE_SYS_UTSNAME_H)
++check_include_file (syscall.h HAVE_SYSCALL_H)
++check_include_file (syslog.h HAVE_SYSLOG_H)
++check_include_file (ucontext.h HAVE_UCONTEXT_H)
++check_include_file (unistd.h HAVE_UNISTD_H)
++check_include_file (unwind.h HAVE_UNWIND_H)
++
++check_include_file_cxx ("ext/hash_map" HAVE_EXT_HASH_MAP)
++check_include_file_cxx ("ext/hash_set" HAVE_EXT_HASH_SET)
++check_include_file_cxx ("ext/slist" HAVE_EXT_SLIST)
++check_include_file_cxx ("tr1/unordered_map" HAVE_TR1_UNORDERED_MAP)
++check_include_file_cxx ("tr1/unordered_set" HAVE_TR1_UNORDERED_SET)
++check_include_file_cxx ("unordered_map" HAVE_UNORDERED_MAP)
++check_include_file_cxx ("unordered_set" HAVE_UNORDERED_SET)
++
++check_type_size ("unsigned __int16" HAVE___UINT16)
++check_type_size (u_int16_t HAVE_U_INT16_T)
++check_type_size (uint16_t HAVE_UINT16_T)
++
++check_function_exists (dladdr HAVE_DLADDR)
++check_function_exists (fcntl HAVE_FCNTL)
++check_function_exists (pread HAVE_PREAD)
++check_function_exists (pwrite HAVE_PWRITE)
++check_function_exists (sigaction HAVE_SIGACTION)
++check_function_exists (sigaltstack HAVE_SIGALSTACK)
++
++# NOTE gcc does not fail if you pass a non-existent -Wno-* option as an
++# argument. However, it will happily fail if you pass the corresponding -W*
++# option. So, we check whether options that disable warnings exist by testing
++# the availability of the corresponding option that enables the warning. This
++# eliminates the need to check for compiler for several (mainly Clang) options.
++
++check_cxx_compiler_flag (-Wdeprecated HAVE_NO_DEPRECATED)
++check_cxx_compiler_flag (-Wunnamed-type-template-args
++    HAVE_NO_UNNAMED_TYPE_TEMPLATE_ARGS)
++
++# NOTE: Cannot use check_function_exists here since >=vc-14.0 can define
++# snprintf as an inline function
++check_symbol_exists (snprintf stdio.h HAVE_SNPRINTF)
++
++check_library_exists (unwind get_static_proc_name "" HAVE_LIB_UNWIND)
++
++find_library (UNWIND_LIBRARY NAMES unwind DOC "unwind library")
++mark_as_advanced (UNWIND_LIBRARY)
++
++check_c_source_compiles ("
++#include <stdlib.h>
++static void foo(void) __attribute__ ((unused));
++int main(void) { return 0; }
++" HAVE___ATTRIBUTE__)
++
++check_c_source_compiles ("
++#include <stdlib.h>
++static void foo(void) __attribute__ ((visibility(\"default\")));
++int main(void) { return 0; }
++" HAVE___ATTRIBUTE__VISIBILITY_DEFAULT)
++
++check_c_source_compiles ("
++#include <stdlib.h>
++static void foo(void) __attribute__ ((visibility(\"hidden\")));
++int main(void) { return 0; }
++" HAVE___ATTRIBUTE__VISIBILITY_HIDDEN)
++
++check_c_source_compiles ("
++int main(void) { if (__builtin_expect(0, 0)) return 1; return 0; }
++" HAVE___BUILTIN_EXPECT)
++
++check_c_source_compiles ("
++int main(void)
++{
++  int a; if (__sync_val_compare_and_swap(&a, 0, 1)) return 1; return 0;
++}
++" HAVE___SYNC_VAL_COMPARE_AND_SWAP)
++
++check_c_source_compiles ("
++#define _XOPEN_SOURCE 500
++#include <pthread.h>
++int main(void)
++{
++  pthread_rwlock_t l;
++  pthread_rwlock_init(&l, NULL);
++  pthread_rwlock_rdlock(&l);
++  return 0;
++}
++" HAVE_RWLOCK)
++
++check_c_source_compiles ("
++__declspec(selectany) int a;
++int main(void) { return 0; }
++" HAVE___DECLSPEC)
++
++check_cxx_source_compiles ("
++#include <vector>
++vector<int> t; int main() { }
++" STL_NO_NAMESPACE)
++
++check_cxx_source_compiles ("
++#include <vector>
++std::vector<int> t; int main() { }
++" STL_STD_NAMESPACE)
++
++check_cxx_source_compiles ("
++#include <iostream>
++std::ostream& operator<<(std::ostream&, struct s);
++using ::operator<<;
++int main() { }
++" HAVE_USING_OPERATOR)
++
++check_cxx_source_compiles ("
++namespace Outer { namespace Inner { int i = 0; }}
++using namespace Outer::Inner;;
++int main() { return i; }
++" HAVE_NAMESPACES)
++
++set (_PC_FIELDS
++  "gregs[REG_PC]"
++  "gregs[REG_EIP]"
++  "gregs[REG_RIP]"
++  "sc_ip"
++  "uc_regs->gregs[PT_NIP]"
++  "gregs[R15]"
++  "arm_pc"
++  "mc_eip"
++  "mc_rip"
++  "__gregs[REG_EIP]"
++  "__gregs[REG_RIP]"
++  "ss.eip"
++  "__ss.__eip"
++  "ss.rip"
++  "__ss.__rip"
++  "ss.srr0"
++  "__ss.__srr0"
++)
++
++set (_PC_HEADERS ucontext.h signal.h)
++
++if (HAVE_UCONTEXT_H AND NOT PC_FROM_UCONTEXT)
++  foreach (_PC_FIELD ${_PC_FIELDS})
++    foreach (_PC_HEADER ${_PC_HEADERS})
++      set (_TMP
++      ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/uctfield.c)
++      file (WRITE ${_TMP} "
++#define _GNU_SOURCE 1
++#include <${_PC_HEADER}>
++int main(void)
++{
++  ucontext_t u;
++  return u.${_PC_FIELD} == 0;
++}
++")
++      try_compile (HAVE_PC_FROM_UCONTEXT ${CMAKE_CURRENT_BINARY_DIR} ${_TMP}
++        COMPILE_DEFINITIONS _GNU_SOURCE=1)
++
++      if (HAVE_PC_FROM_UCONTEXT)
++        set (PC_FROM_UCONTEXT ${_PC_FIELD} CACHE)
++      endif (HAVE_PC_FROM_UCONTEXT)
++    endforeach (_PC_HEADER)
++  endforeach (_PC_FIELD)
++endif  (HAVE_UCONTEXT_H AND NOT PC_FROM_UCONTEXT)
++
++if (STL_STD_NAMESPACE)
++  set (STL_NAMESPACE std)
++else (STL_STD_NAMESPACE)
++  set (STL_NAMESPACE "")
++endif (STL_STD_NAMESPACE)
++
++set (GOOGLE_NAMESPACE google)
++set (_START_GOOGLE_NAMESPACE_ "namespace ${GOOGLE_NAMESPACE} {")
++set (_END_GOOGLE_NAMESPACE_ "}")
++
++if (HAVE___UINT16)
++  set (ac_cv_have___uint16 1)
++else (HAVE___UINT16)
++  set (ac_cv_have___uint16 0)
++endif (HAVE___UINT16)
++
++if (HAVE_INTTYPES_H)
++  set (ac_cv_have_inttypes_h 1)
++else (HAVE_INTTYPES_H)
++  set (ac_cv_have_inttypes_h 0)
++endif (HAVE_INTTYPES_H)
++
++if (HAVE_LIB_GFLAGS)
++  set (ac_cv_have_libgflags 1)
++else (HAVE_LIB_GFLAGS)
++  set (ac_cv_have_libgflags 0)
++endif (HAVE_LIB_GFLAGS)
++
++if (HAVE_STDINT_H)
++  set (ac_cv_have_stdint_h 1)
++else (HAVE_STDINT_H)
++  set (ac_cv_have_stdint_h 0)
++endif (HAVE_STDINT_H)
++
++if (HAVE_SYS_TYPES_H)
++  set (ac_cv_have_systypes_h 1)
++else (HAVE_SYS_TYPES_H)
++  set (ac_cv_have_systypes_h 0)
++endif (HAVE_SYS_TYPES_H)
++
++if (HAVE_U_INT16_T)
++  set (ac_cv_have_u_int16_t 1)
++else (HAVE_U_INT16_T)
++  set (ac_cv_have_u_int16_t 0)
++endif (HAVE_U_INT16_T)
++
++if (HAVE_UINT16_T)
++  set (ac_cv_have_uint16_t 1)
++else (HAVE_UINT16_T)
++  set (ac_cv_have_uint16_t 0)
++endif (HAVE_UINT16_T)
++
++if (HAVE_UNISTD_H)
++  set (ac_cv_have_unistd_h 1)
++else (HAVE_UNISTD_H)
++  set (ac_cv_have_unistd_h 0)
++endif (HAVE_UNISTD_H)
++
++set (ac_google_namespace ${GOOGLE_NAMESPACE})
++set (ac_google_end_namespace ${_END_GOOGLE_NAMESPACE_})
++set (ac_google_start_namespace ${_START_GOOGLE_NAMESPACE_})
++
++if (HAVE___ATTRIBUTE__)
++  set (ac_cv___attribute___noreturn "__attribute__((noreturn))")
++  set (ac_cv___attribute___noinline "__attribute__((noinline))")
++elseif (HAVE___DECLSPEC)
++  set (ac_cv___attribute___noreturn "__declspec(noreturn)")
++  #set (ac_cv___attribute___noinline "__declspec(noinline)")
++endif (HAVE___ATTRIBUTE__)
++
++if (HAVE___BUILTIN_EXPECT)
++  set (ac_cv_have___builtin_expect 1)
++else (HAVE___BUILTIN_EXPECT)
++  set (ac_cv_have___builtin_expect 0)
++endif (HAVE___BUILTIN_EXPECT)
++
++if (HAVE_USING_OPERATOR)
++  set (ac_cv_cxx_using_operator 1)
++else (HAVE_USING_OPERATOR)
++  set (ac_cv_cxx_using_operator 0)
++endif (HAVE_USING_OPERATOR)
++
++set (SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
++
++if (WITH_THREADS AND Threads_FOUND)
++  if (CMAKE_USE_PTHREADS_INIT)
++    set (HAVE_PTHREAD 1)
++  endif (CMAKE_USE_PTHREADS_INIT)
++else (WITH_THREADS AND Threads_FOUND)
++  set (NO_THREADS 1)
++endif (WITH_THREADS AND Threads_FOUND)
++
++set (TEST_SRC_DIR \"${CMAKE_CURRENT_SOURCE_DIR}\")
++
++configure_file (src/config.h.cmake.in config.h)
++configure_file (src/glog/logging.h.in glog/logging.h @ONLY)
++configure_file (src/glog/raw_logging.h.in glog/raw_logging.h @ONLY)
++configure_file (src/glog/stl_logging.h.in glog/stl_logging.h @ONLY)
++configure_file (src/glog/vlog_is_on.h.in glog/vlog_is_on.h @ONLY)
++
++set (CMAKE_CXX_VISIBILITY_PRESET default)
++set (CMAKE_VISIBILITY_INLINES_HIDDEN 1)
++
++set (GLOG_PUBLIC_H
++  ${CMAKE_CURRENT_BINARY_DIR}/config.h
++  ${CMAKE_CURRENT_BINARY_DIR}/glog/logging.h
++  ${CMAKE_CURRENT_BINARY_DIR}/glog/raw_logging.h
++  ${CMAKE_CURRENT_BINARY_DIR}/glog/stl_logging.h
++  ${CMAKE_CURRENT_BINARY_DIR}/glog/vlog_is_on.h
++  src/glog/log_severity.h
++)
++
++set (GLOG_SRCS
++  ${GLOG_PUBLIC_H}
++  src/base/commandlineflags.h
++  src/base/googleinit.h
++  src/base/mutex.h
++  src/demangle.cc
++  src/demangle.h
++  src/logging.cc
++  src/raw_logging.cc
++  src/symbolize.cc
++  src/symbolize.h
++  src/utilities.cc
++  src/utilities.h
++  src/vlog_is_on.cc
++)
++
++if (HAVE_PTHREAD)
++  list (APPEND GLOG_SRCS src/signalhandler.cc)
++endif (HAVE_PTHREAD)
++
++if (WIN32)
++  list (APPEND GLOG_SRCS
++    src/windows/port.cc
++    src/windows/port.h
++  )
++endif (WIN32)
++
++add_compile_options ($<$<BOOL:${HAVE_NO_UNNAMED_TYPE_TEMPLATE_ARGS}>:-Wno-unnamed-type-template-args>)
++
++add_library (glog
++  ${GLOG_SRCS}
++)
++
++set_target_properties (glog PROPERTIES POSITION_INDEPENDENT_CODE ON)
++
++if (UNWIND_LIBRARY)
++  target_link_libraries (glog PUBLIC ${UNWIND_LIBRARY})
++endif (UNWIND_LIBRARY)
++
++if (HAVE_PTHREAD)
++  target_link_libraries (glog PUBLIC ${CMAKE_THREAD_LIBS_INIT})
++endif (HAVE_PTHREAD)
++
++if (WIN32 AND HAVE_SNPRINTF)
++  set_property (SOURCE src/windows/port.cc APPEND PROPERTY COMPILE_DEFINITIONS
++    HAVE_SNPRINTF)
++endif (WIN32 AND HAVE_SNPRINTF)
++
++if (gflags_FOUND)
++  target_include_directories (glog PUBLIC $<BUILD_INTERFACE:${gflags_INCLUDE_DIR}>)
++  target_link_libraries (glog PUBLIC ${gflags_LIBRARIES})
++
++  if (NOT BUILD_SHARED_LIBS)
++    # Don't use __declspec(dllexport|dllimport) if this is a static build
++    targeT_compile_definitions (glog PUBLIC GFLAGS_DLL_DECLARE_FLAG= GFLAGS_DLL_DEFINE_FLAG=)
++  endif (NOT BUILD_SHARED_LIBS)
++endif (gflags_FOUND)
++
++set_target_properties (glog PROPERTIES VERSION ${GLOG_MAJOR_VERSION})
++set_target_properties (glog PROPERTIES SOVERSION ${GLOG_VERSION})
++
++if (WIN32)
++  target_compile_definitions (glog PUBLIC GLOG_NO_ABBREVIATED_SEVERITIES)
++endif (WIN32)
++
++set_target_properties (glog PROPERTIES PUBLIC_HEADER "${GLOG_PUBLIC_H}")
++
++target_include_directories (glog BEFORE PUBLIC
++  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
++  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
++  "$<INSTALL_INTERFACE:include>"
++  PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
++  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
++
++if (WIN32)
++  target_include_directories (glog PUBLIC
++    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/windows>"
++    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/windows)
++endif (WIN32)
++
++set_target_properties (glog PROPERTIES DEFINE_SYMBOL LIBGLOG_EXPORTS)
++
++if (NOT BUILD_SHARED_LIBS)
++  target_compile_definitions (glog PUBLIC GOOGLE_GLOG_DLL_DECL=)
++else (NOT BUILD_SHARED_LIBS)
++  target_compile_definitions (glog PRIVATE GOOGLE_GLOG_IS_A_DLL=1)
++
++  if (HAVE___ATTRIBUTE__VISIBILITY_DEFAULT)
++    set (_EXPORT "__attribute__((visibility(\"default\")))")
++    set (_IMPORT "")
++  elseif (HAVE___DECLSPEC)
++    set (_EXPORT "__declspec(dllexport)")
++    set (_IMPORT "__declspec(dllimport)")
++  endif (HAVE___ATTRIBUTE__VISIBILITY_DEFAULT)
++
++  target_compile_definitions (glog PRIVATE
++    "GOOGLE_GLOG_DLL_DECL=${_EXPORT}")
++  target_compile_definitions (glog INTERFACE
++    "GOOGLE_GLOG_DLL_DECL=${_IMPORT}")
++  target_compile_definitions (glog INTERFACE
++    "GOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=${_IMPORT}")
++endif (NOT BUILD_SHARED_LIBS)
++
++if (HAVE_EXECINFO_H)
++  set (HAVE_STACKTRACE 1)
++endif (HAVE_EXECINFO_H)
++
++if (UNIX OR (APPLE AND HAVE_DLADDR))
++  set (HAVE_SYMBOLIZE 1)
++endif (UNIX OR (APPLE AND HAVE_DLADDR))
++
++# Unit testing
++
++if (BUILD_TESTING)
++  add_executable (logging_unittest
++    src/logging_unittest.cc
++  )
++
++  target_link_libraries (logging_unittest PRIVATE glog)
++
++  add_executable (stl_logging_unittest
++    src/stl_logging_unittest.cc
++  )
++
++  target_link_libraries (stl_logging_unittest PRIVATE glog)
++
++  if (HAVE_NO_DEPRECATED)
++    set_property (TARGET stl_logging_unittest APPEND PROPERTY COMPILE_OPTIONS
++      -Wno-deprecated)
++  endif (HAVE_NO_DEPRECATED)
++
++  if (HAVE_UNORDERED_MAP AND HAVE_UNORDERED_SET)
++    target_compile_definitions (stl_logging_unittest PRIVATE
++      GLOG_STL_LOGGING_FOR_UNORDERED)
++  endif (HAVE_UNORDERED_MAP AND HAVE_UNORDERED_SET)
++
++  if (HAVE_TR1_UNORDERED_MAP AND HAVE_TR1_UNORDERED_SET)
++    target_compile_definitions (stl_logging_unittest PRIVATE
++      GLOG_STL_LOGGING_FOR_TR1_UNORDERED)
++  endif (HAVE_TR1_UNORDERED_MAP AND HAVE_TR1_UNORDERED_SET)
++
++  if (HAVE_EXT_HASH_MAP AND HAVE_EXT_HASH_SET)
++    target_compile_definitions (stl_logging_unittest PRIVATE
++      GLOG_STL_LOGGING_FOR_EXT_HASH)
++  endif (HAVE_EXT_HASH_MAP AND HAVE_EXT_HASH_SET)
++
++  if (HAVE_EXT_SLIST)
++    target_compile_definitions (stl_logging_unittest PRIVATE
++      GLOG_STL_LOGGING_FOR_EXT_SLIST)
++  endif (HAVE_EXT_SLIST)
++
++  if (HAVE_SYMBOLIZE)
++    add_executable (symbolize_unittest
++      src/symbolize_unittest.cc
++    )
++
++    target_link_libraries (symbolize_unittest PRIVATE glog)
++  endif (HAVE_SYMBOLIZE)
++
++  add_executable (demangle_unittest
++    src/demangle_unittest.cc
++  )
++
++  target_link_libraries (demangle_unittest PRIVATE glog)
++
++  if (HAVE_STACKTRACE)
++    add_executable (stacktrace_unittest
++      src/stacktrace_unittest.cc
++    )
++
++    target_link_libraries (stacktrace_unittest PRIVATE glog)
++  endif (HAVE_STACKTRACE)
++
++  add_executable (utilities_unittest
++    src/utilities_unittest.cc
++  )
++
++  target_link_libraries (utilities_unittest PRIVATE glog)
++
++  if (HAVE_STACKTRACE AND HAVE_SYMBOLIZE)
++    add_executable (signalhandler_unittest
++      src/signalhandler_unittest.cc
++    )
++
++    target_link_libraries (signalhandler_unittest PRIVATE glog)
++  endif (HAVE_STACKTRACE AND HAVE_SYMBOLIZE)
++
++  add_test (NAME demangle COMMAND demangle_unittest)
++  add_test (NAME logging COMMAND logging_unittest)
++
++  if (TARGET signalhandler_unittest)
++    add_test (NAME signalhandler COMMAND signalhandler_unittest)
++  endif (TARGET signalhandler_unittest)
++
++  if (TARGET stacktrace_unittest)
++    add_test (NAME stacktrace COMMAND stacktrace_unittest)
++  endif (TARGET stacktrace_unittest)
++
++  add_test (NAME stl_logging COMMAND stl_logging_unittest)
++
++  if (TARGET symbolize_unittest)
++    add_test (NAME symbolize COMMAND symbolize_unittest)
++  endif (TARGET symbolize_unittest)
++endif (BUILD_TESTING)
++
++install (TARGETS glog
++  EXPORT glog-targets
++  RUNTIME DESTINATION bin
++  PUBLIC_HEADER DESTINATION include/glog
++  LIBRARY DESTINATION lib
++  ARCHIVE DESTINATION lib)
++
++if (gflags_FOUND)
++  set (gflags_DEPENDENCY "find_dependency (gflags ${gflags_VERSION})")
++endif (gflags_FOUND)
++
++configure_package_config_file (glog-config.cmake.in
++  ${CMAKE_CURRENT_BINARY_DIR}/glog-config.cmake
++  INSTALL_DESTINATION lib/cmake/glog
++  NO_CHECK_REQUIRED_COMPONENTS_MACRO)
++
++write_basic_package_version_file (glog-config-version.cmake VERSION
++  ${GLOG_VERSION} COMPATIBILITY SameMajorVersion)
++
++export (TARGETS glog NAMESPACE glog:: FILE glog-targets.cmake)
++export (PACKAGE glog)
++
++install (FILES
++  ${CMAKE_CURRENT_BINARY_DIR}/glog-config.cmake
++  ${CMAKE_CURRENT_BINARY_DIR}/glog-config-version.cmake
++  DESTINATION lib/cmake/glog)
++
++install (EXPORT glog-targets NAMESPACE glog:: DESTINATION lib/cmake/glog)
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+new file mode 100644
+index 0000000..43de4c9
+--- /dev/null
++++ b/CONTRIBUTING.md
+@@ -0,0 +1,58 @@
++# How to contribute #
++
++We'd love to accept your patches and contributions to this project.  There are
++a just a few small guidelines you need to follow.
++
++
++## Contributor License Agreement ##
++
++Contributions to any Google project must be accompanied by a Contributor
++License Agreement.  This is not a copyright **assignment**, it simply gives
++Google permission to use and redistribute your contributions as part of the
++project.
++
++  * If you are an individual writing original source code and you're sure you
++    own the intellectual property, then you'll need to sign an [individual
++    CLA][].
++
++  * If you work for a company that wants to allow you to contribute your work,
++    then you'll need to sign a [corporate CLA][].
++
++You generally only need to submit a CLA once, so if you've already submitted
++one (even if it was for a different project), you probably don't need to do it
++again.
++
++[individual CLA]: https://developers.google.com/open-source/cla/individual
++[corporate CLA]: https://developers.google.com/open-source/cla/corporate
++
++Once your CLA is submitted (or if you already submitted one for
++another Google project), make a commit adding yourself to the
++[AUTHORS][] and [CONTRIBUTORS][] files. This commit can be part
++of your first [pull request][].
++
++[AUTHORS]: AUTHORS
++[CONTRIBUTORS]: CONTRIBUTORS
++
++
++## Submitting a patch ##
++
++  1. It's generally best to start by opening a new issue describing the bug or
++     feature you're intending to fix.  Even if you think it's relatively minor,
++     it's helpful to know what people are working on.  Mention in the initial
++     issue that you are planning to work on that bug or feature so that it can
++     be assigned to you.
++
++  1. Follow the normal process of [forking][] the project, and setup a new
++     branch to work in.  It's important that each group of changes be done in
++     separate branches in order to ensure that a pull request only includes the
++     commits related to that bug or feature.
++
++  1. Do your best to have [well-formed commit messages][] for each change.
++     This provides consistency throughout the project, and ensures that commit
++     messages are able to be formatted properly by various git tools.
++
++  1. Finally, push the commits to your fork and submit a [pull request][].
++
++[forking]: https://help.github.com/articles/fork-a-repo
++[well-formed commit messages]: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
++[pull request]: https://help.github.com/articles/creating-a-pull-request
+diff --git a/CONTRIBUTORS b/CONTRIBUTORS
+new file mode 100644
+index 0000000..70c0ace
+--- /dev/null
++++ b/CONTRIBUTORS
+@@ -0,0 +1,40 @@
++# People who have agreed to one of the CLAs and can contribute patches.
++# The AUTHORS file lists the copyright holders; this file
++# lists people.  For example, Google employees are listed here
++# but not in AUTHORS, because Google holds the copyright.
++#
++# Names should be added to this file only after verifying that
++# the individual or the individual's organization has agreed to
++# the appropriate Contributor License Agreement, found here:
++#
++# https://developers.google.com/open-source/cla/individual
++# https://developers.google.com/open-source/cla/corporate
++#
++# The agreement for individuals can be filled out on the web.
++#
++# When adding J Random Contributor's name to this file,
++# either J's name or J's organization's name should be
++# added to the AUTHORS file, depending on whether the
++# individual or corporate CLA was used.
++#
++# Names should be added to this file as:
++#     Name <email address>
++#
++# Please keep the list sorted.
++
++Abhishek Dasgupta <abhi2743@gmail.com>
++Abhishek Parmar <abhishek@orng.net>
++Andy Ying <andy@trailofbits.com>
++Brian Silverman <bsilver16384@gmail.com>
++Fumitoshi Ukai <ukai@google.com>
++Guillaume Dumont <dumont.guillaume@gmail.com>
++Håkan L. S. Younes <hyounes@google.com>
++Ivan Penkov <ivanpe@google.com>
++Michael Tanner <michael@tannertaxpro.com>
++MiniLight <MiniLightAR@Gmail.com>
++Peter Collingbourne <pcc@google.com>
++romange <romange@users.noreply.github.com>
++Sergiu Deitsch <sergiu.deitsch@gmail.com>
++Shinichiro Hamaji <hamaji@google.com>
++tbennun <tbennun@gmail.com>
++Teddy Reed <teddy@prosauce.org>
+diff --git a/cmake/DetermineGflagsNamespace.cmake b/cmake/DetermineGflagsNamespace.cmake
+new file mode 100755
+index 0000000..e5e50cc
+--- /dev/null
++++ b/cmake/DetermineGflagsNamespace.cmake
+@@ -0,0 +1,69 @@
++macro(determine_gflags_namespace VARIABLE)
++  if (NOT DEFINED "${VARIABLE}")
++    if (CMAKE_REQUIRED_INCLUDES)
++      set (CHECK_INCLUDE_FILE_CXX_INCLUDE_DIRS "-DINCLUDE_DIRECTORIES=${CMAKE_REQUIRED_INCLUDES}")
++    else ()
++      set (CHECK_INCLUDE_FILE_CXX_INCLUDE_DIRS)
++    endif ()
++
++    set(MACRO_CHECK_INCLUDE_FILE_FLAGS ${CMAKE_REQUIRED_FLAGS})
++
++    set(_NAMESPACES gflags google)
++    set(_check_code
++"
++#include <gflags/gflags.h>
++
++int main(int argc, char**argv)
++{
++  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
++}
++")
++    if (NOT CMAKE_REQUIRED_QUIET)
++      message (STATUS "Looking for gflags namespace")
++    endif ()
++    if (${ARGC} EQUAL 3)
++      set (CMAKE_CXX_FLAGS_SAVE ${CMAKE_CXX_FLAGS})
++      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARGV2}")
++    endif ()
++
++    set (_check_file
++        ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/DetermineGflagsNamespace.cxx)
++
++    foreach (_namespace ${_NAMESPACES})
++      file (WRITE "${_check_file}" "${_check_code}")
++      try_compile (${VARIABLE}
++        "${CMAKE_BINARY_DIR}" "${_check_file}"
++        COMPILE_DEFINITIONS "${CMAKE_REQUIRED_DEFINITIONS}" -DGFLAGS_NAMESPACE=${_namespace}
++        LINK_LIBRARIES "${gflags_LIBRARIES}"
++        CMAKE_FLAGS -DINCLUDE_DIRECTORIES:STRING="${gflags_INCLUDE_DIR}"
++        OUTPUT_VARIABLE OUTPUT)
++
++      if (${VARIABLE})
++        set (${VARIABLE} ${_namespace} CACHE INTERNAL "gflags namespace" FORCE)
++        break ()
++      else ()
++        file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
++          "Determining the gflags namespace ${_namespace} failed with the following output:\n"
++          "${OUTPUT}\n\n")
++      endif ()
++    endforeach (_namespace)
++
++    if (${ARGC} EQUAL 3)
++      set (CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS_SAVE})
++    endif ()
++
++    if (${VARIABLE})
++      if (NOT CMAKE_REQUIRED_QUIET)
++        message (STATUS "Looking for gflags namespace - ${${VARIABLE}}")
++      endif ()
++      file (APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
++        "Determining the gflags namespace passed with the following output:\n"
++        "${OUTPUT}\n\n")
++    else ()
++      if (NOT CMAKE_REQUIRED_QUIET)
++        message (STATUS "Looking for gflags namespace - failed")
++      endif ()
++      set (${VARIABLE} ${_namespace} CACHE INTERNAL "gflags namespace")
++    endif ()
++  endif ()
++endmacro ()
+diff --git a/cmake/INSTALL.md b/cmake/INSTALL.md
+new file mode 100644
+index 0000000..bdc1cd9
+--- /dev/null
++++ b/cmake/INSTALL.md
+@@ -0,0 +1,30 @@
++Building Glog with CMake
++========================
++
++1. Create a build directory and `cd` to it.
++2. Run
++    ```bash
++    cmake path/to/glog
++    ```
++
++3. Afterwards, generated files (GNU make, Visual Studio, etc.) can be used to
++   compile the project.
++
++
++Consuming Glog in a CMake Project
++=================================
++
++To use Glog in your project `myproj`, use:
++
++```cmake
++cmake_minimum_required (VERSION 3.0)
++project (myproj)
++
++find_package (glog 0.3.4 REQUIRED)
++
++add_executable (myapp main.cpp)
++target_link_libraries (myapp glog::glog)
++```
++
++Compile definitions and options will be added automatically to your target as
++needed.
+diff --git a/config.guess b/config.guess
+index 278f9e9..db360b8 100755
+--- a/config.guess
++++ b/config.guess
+@@ -911,6 +911,9 @@ EOF
+     ppc64:Linux:*:*)
+ 	echo powerpc64-unknown-linux-gnu
+ 	exit ;;
++    ppc64le:Linux:*:*)
++        echo powerpc64le-unknown-linux-gnu
++        exit ;;
+     alpha:Linux:*:*)
+ 	case `sed -n '/^cpu model/s/^.*: \(.*\)/\1/p' < /proc/cpuinfo` in
+ 	  EV5)   UNAME_MACHINE=alphaev5 ;;
+diff --git a/glog-config.cmake.in b/glog-config.cmake.in
+new file mode 100644
+index 0000000..e3c44ae
+--- /dev/null
++++ b/glog-config.cmake.in
+@@ -0,0 +1,7 @@
++@PACKAGE_INIT@
++
++include (CMakeFindDependencyMacro)
++
++@gflags_DEPENDENCY@
++
++include ("${CMAKE_CURRENT_LIST_DIR}/glog-targets.cmake")
+diff --git a/src/base/mutex.h b/src/base/mutex.h
+index 37527d5..ced2b99 100644
+--- a/src/base/mutex.h
++++ b/src/base/mutex.h
+@@ -134,7 +134,9 @@
+   // *does* cause problems for FreeBSD, or MacOSX, but isn't needed
+   // for locking there.)
+ # ifdef __linux__
+-#   define _XOPEN_SOURCE 500  // may be needed to get the rwlock calls
++#   ifndef _XOPEN_SOURCE  // Some other header might have already set it for us.
++#     define _XOPEN_SOURCE 500  // may be needed to get the rwlock calls
++#   endif
+ # endif
+ # include <pthread.h>
+   typedef pthread_rwlock_t MutexType;
+diff --git a/src/config.h.cmake.in b/src/config.h.cmake.in
+new file mode 100644
+index 0000000..6635df1
+--- /dev/null
++++ b/src/config.h.cmake.in
+@@ -0,0 +1,184 @@
++/* define if glog doesn't use RTTI */
++#cmakedefine DISABLE_RTTI
++
++/* Namespace for Google classes */
++#cmakedefine GOOGLE_NAMESPACE ${GOOGLE_NAMESPACE}
++
++/* Define if you have the `dladdr' function */
++#cmakedefine HAVE_DLADDR
++
++/* Define if you have the `snprintf' function */
++#cmakedefine HAVE_SNPRINTF
++
++/* Define to 1 if you have the <dlfcn.h> header file. */
++#cmakedefine HAVE_DLFCN_H
++
++/* Define to 1 if you have the <execinfo.h> header file. */
++#cmakedefine HAVE_EXECINFO_H
++
++/* Define if you have the `fcntl' function */
++#cmakedefine HAVE_FCNTL
++
++/* Define to 1 if you have the <glob.h> header file. */
++#cmakedefine HAVE_GLOB_H
++
++/* Define to 1 if you have the <inttypes.h> header file. */
++#cmakedefine HAVE_INTTYPES_H ${HAVE_INTTYPES_H}
++
++/* Define to 1 if you have the `pthread' library (-lpthread). */
++#cmakedefine HAVE_LIBPTHREAD
++
++/* Define to 1 if you have the <libunwind.h> header file. */
++#cmakedefine HAVE_LIBUNWIND_H
++
++/* define if you have google gflags library */
++#cmakedefine HAVE_LIB_GFLAGS
++
++/* define if you have google gmock library */
++#cmakedefine HAVE_LIB_GMOCK
++
++/* define if you have google gtest library */
++#cmakedefine HAVE_LIB_GTEST
++
++/* define if you have libunwind */
++#cmakedefine HAVE_LIB_UNWIND
++
++/* Define to 1 if you have the <memory.h> header file. */
++#cmakedefine HAVE_MEMORY_H
++
++/* define to disable multithreading support. */
++#cmakedefine NO_THREADS
++
++/* define if the compiler implements namespaces */
++#cmakedefine HAVE_NAMESPACES
++
++/* Define if you have the 'pread' function */
++#cmakedefine HAVE_PREAD
++
++/* Define if you have POSIX threads libraries and header files. */
++#cmakedefine HAVE_PTHREAD
++
++/* Define to 1 if you have the <pwd.h> header file. */
++#cmakedefine HAVE_PWD_H
++
++/* Define if you have the 'pwrite' function */
++#cmakedefine HAVE_PWRITE
++
++/* define if the compiler implements pthread_rwlock_* */
++#cmakedefine HAVE_RWLOCK
++
++/* Define if you have the 'sigaction' function */
++#cmakedefine HAVE_SIGACTION
++
++/* Define if you have the `sigaltstack' function */
++#cmakedefine HAVE_SIGALTSTACK
++
++/* Define to 1 if you have the <stdint.h> header file. */
++#cmakedefine HAVE_STDINT_H ${HAVE_STDINT_H}
++
++/* Define to 1 if you have the <stdlib.h> header file. */
++#cmakedefine HAVE_STDLIB_H
++
++/* Define to 1 if you have the <strings.h> header file. */
++#cmakedefine HAVE_STRINGS_H
++
++/* Define to 1 if you have the <string.h> header file. */
++#cmakedefine HAVE_STRING_H
++
++/* Define to 1 if you have the <syscall.h> header file. */
++#cmakedefine HAVE_SYSCALL_H
++
++/* Define to 1 if you have the <syslog.h> header file. */
++#cmakedefine HAVE_SYSLOG_H
++
++/* Define to 1 if you have the <sys/stat.h> header file. */
++#cmakedefine HAVE_SYS_STAT_H
++
++/* Define to 1 if you have the <sys/syscall.h> header file. */
++#cmakedefine HAVE_SYS_SYSCALL_H
++
++/* Define to 1 if you have the <sys/time.h> header file. */
++#cmakedefine HAVE_SYS_TIME_H
++
++/* Define to 1 if you have the <sys/types.h> header file. */
++#cmakedefine HAVE_SYS_TYPES_H ${HAVE_SYS_TYPES_H}
++
++/* Define to 1 if you have the <sys/ucontext.h> header file. */
++#cmakedefine HAVE_SYS_UCONTEXT_H
++
++/* Define to 1 if you have the <sys/utsname.h> header file. */
++#cmakedefine HAVE_SYS_UTSNAME_H
++
++/* Define to 1 if you have the <ucontext.h> header file. */
++#cmakedefine HAVE_UCONTEXT_H
++
++/* Define to 1 if you have the <unistd.h> header file. */
++#cmakedefine HAVE_UNISTD_H ${HAVE_UNISTD_H}
++
++/* Define to 1 if you have the <unwind.h> header file. */
++#cmakedefine HAVE_UNWIND_H ${HAVE_UNWIND_H}
++
++/* define if the compiler supports using expression for operator */
++#cmakedefine HAVE_USING_OPERATOR
++
++/* define if your compiler has __attribute__ */
++#cmakedefine HAVE___ATTRIBUTE__
++
++/* define if your compiler has __builtin_expect */
++#cmakedefine HAVE___BUILTIN_EXPECT ${HAVE___BUILTIN_EXPECT}
++
++/* define if your compiler has __sync_val_compare_and_swap */
++#cmakedefine HAVE___SYNC_VAL_COMPARE_AND_SWAP
++
++/* Define to the sub-directory in which libtool stores uninstalled libraries.
++   */
++#cmakedefine LT_OBJDIR
++
++/* Name of package */
++#cmakedefine PACKAGE
++
++/* Define to the address where bug reports for this package should be sent. */
++#cmakedefine PACKAGE_BUGREPORT
++
++/* Define to the full name of this package. */
++#cmakedefine PACKAGE_NAME
++
++/* Define to the full name and version of this package. */
++#cmakedefine PACKAGE_STRING
++
++/* Define to the one symbol short name of this package. */
++#cmakedefine PACKAGE_TARNAME
++
++/* Define to the home page for this package. */
++#cmakedefine PACKAGE_URL
++
++/* Define to the version of this package. */
++#cmakedefine PACKAGE_VERSION
++
++/* How to access the PC from a struct ucontext */
++#cmakedefine PC_FROM_UCONTEXT
++
++/* Define to necessary symbol if this constant uses a non-standard name on
++   your system. */
++#cmakedefine PTHREAD_CREATE_JOINABLE
++
++/* The size of `void *', as computed by sizeof. */
++#cmakedefine SIZEOF_VOID_P ${SIZEOF_VOID_P}
++
++/* Define to 1 if you have the ANSI C header files. */
++#cmakedefine STDC_HEADERS
++
++/* the namespace where STL code like vector<> is defined */
++#cmakedefine STL_NAMESPACE ${STL_NAMESPACE}
++
++/* location of source code */
++#cmakedefine TEST_SRC_DIR ${TEST_SRC_DIR}
++
++/* Version number of package */
++#cmakedefine VERSION
++
++/* Stops putting the code inside the Google namespace */
++#cmakedefine _END_GOOGLE_NAMESPACE_ ${_END_GOOGLE_NAMESPACE_}
++
++/* Puts following code inside the Google namespace */
++#cmakedefine _START_GOOGLE_NAMESPACE_ ${_START_GOOGLE_NAMESPACE_}
+diff --git a/src/demangle.h b/src/demangle.h
+index 9c75915..991b6ff 100644
+--- a/src/demangle.h
++++ b/src/demangle.h
+@@ -71,13 +71,14 @@
+ #define BASE_DEMANGLE_H_
+ 
+ #include "config.h"
++#include "glog/logging.h"
+ 
+ _START_GOOGLE_NAMESPACE_
+ 
+ // Demangle "mangled".  On success, return true and write the
+ // demangled symbol name to "out".  Otherwise, return false.
+ // "out" is modified even if demangling is unsuccessful.
+-bool Demangle(const char *mangled, char *out, int out_size);
++bool GOOGLE_GLOG_DLL_DECL Demangle(const char *mangled, char *out, int out_size);
+ 
+ _END_GOOGLE_NAMESPACE_
+ 
+diff --git a/src/demangle_unittest.cc b/src/demangle_unittest.cc
+index 9d219e6..32f3221 100644
+--- a/src/demangle_unittest.cc
++++ b/src/demangle_unittest.cc
+@@ -41,6 +41,11 @@
+ #include "googletest.h"
+ #include "config.h"
+ 
++#ifdef HAVE_LIB_GFLAGS
++#include <gflags/gflags.h>
++using namespace GFLAGS_NAMESPACE;
++#endif
++
+ GLOG_DEFINE_bool(demangle_filter, false,
+                  "Run demangle_unittest in filter mode");
+ 
+diff --git a/src/glog/logging.h.in b/src/glog/logging.h.in
+index e8e3e7a..b1de2c9 100644
+--- a/src/glog/logging.h.in
++++ b/src/glog/logging.h.in
+@@ -48,14 +48,6 @@
+ #endif
+ #include <vector>
+ 
+-// Annoying stuff for windows -- makes sure clients can import these functions
+-#ifndef GOOGLE_GLOG_DLL_DECL
+-# if defined(_WIN32) && !defined(__CYGWIN__)
+-#   define GOOGLE_GLOG_DLL_DECL  __declspec(dllimport)
+-# else
+-#   define GOOGLE_GLOG_DLL_DECL
+-# endif
+-#endif
+ #if defined(_MSC_VER)
+ #define GLOG_MSVC_PUSH_DISABLE_WARNING(n) __pragma(warning(push)) \
+                                      __pragma(warning(disable:n))
+@@ -65,6 +57,15 @@
+ #define GLOG_MSVC_POP_WARNING()
+ #endif
+ 
++// Annoying stuff for windows -- makes sure clients can import these functions
++#ifndef GOOGLE_GLOG_DLL_DECL
++# if defined(_WIN32) && !defined(__CYGWIN__)
++#   define GOOGLE_GLOG_DLL_DECL  __declspec(dllimport)
++# else
++#   define GOOGLE_GLOG_DLL_DECL
++# endif
++#endif
++
+ // We care a lot about number of bits things take up.  Unfortunately,
+ // systems define their bit-specific ints in a lot of different ways.
+ // We use our own way, and have a typedef to get there.
+@@ -129,15 +130,28 @@ typedef unsigned __int64 uint64;
+ #ifndef GOOGLE_PREDICT_BRANCH_NOT_TAKEN
+ #if @ac_cv_have___builtin_expect@
+ #define GOOGLE_PREDICT_BRANCH_NOT_TAKEN(x) (__builtin_expect(x, 0))
+-#define GOOGLE_PREDICT_FALSE(x) (__builtin_expect(x, 0))
+-#define GOOGLE_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
+ #else
+ #define GOOGLE_PREDICT_BRANCH_NOT_TAKEN(x) x
++#endif
++#endif
++
++#ifndef GOOGLE_PREDICT_FALSE
++#if @ac_cv_have___builtin_expect@
++#define GOOGLE_PREDICT_FALSE(x) (__builtin_expect(x, 0))
++#else
+ #define GOOGLE_PREDICT_FALSE(x) x
++#endif
++#endif
++
++#ifndef GOOGLE_PREDICT_TRUE
++#if @ac_cv_have___builtin_expect@
++#define GOOGLE_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
++#else
+ #define GOOGLE_PREDICT_TRUE(x) x
+ #endif
+ #endif
+ 
++
+ // Make a bunch of macros for logging.  The way to log things is to stream
+ // things to LOG(<a particular severity level>).  E.g.,
+ //
+@@ -347,6 +361,9 @@ DECLARE_int32(minloglevel);
+ // default logging directory.
+ DECLARE_string(log_dir);
+ 
++// Set the log file mode.
++DECLARE_int32(logfile_mode);
++
+ // Sets the path of the directory into which to put additional links
+ // to the log files.
+ DECLARE_string(log_link);
+@@ -542,7 +559,7 @@ class LogSink;  // defined below
+ //   vector<string> *outvec;
+ // The cast is to disambiguate NULL arguments.
+ #define LOG_STRING(severity, outvec) \
+-  LOG_TO_STRING_##severity(static_cast<vector<string>*>(outvec)).stream()
++  LOG_TO_STRING_##severity(static_cast<std::vector<std::string>*>(outvec)).stream()
+ 
+ #define LOG_IF(severity, condition) \
+   !(condition) ? (void) 0 : @ac_google_namespace@::LogMessageVoidify() & LOG(severity)
+@@ -710,10 +727,10 @@ DEFINE_CHECK_OP_IMPL(Check_GT, > )
+ // to reduce the overhead of CHECK statments by 2x.
+ // Real DCHECK-heavy tests have seen 1.5x speedups.
+ 
+-// The meaning of "string" might be different between now and 
++// The meaning of "string" might be different between now and
+ // when this macro gets invoked (e.g., if someone is experimenting
+ // with other string implementations that get defined after this
+-// file is included).  Save the current meaning now and use it 
++// file is included).  Save the current meaning now and use it
+ // in the macro.
+ typedef std::string _Check_string;
+ #define CHECK_OP_LOG(name, op, val1, val2, log)                         \
+@@ -906,6 +923,9 @@ template <bool>
+ struct CompileAssert {
+ };
+ struct CrashReason;
++
++// Returns true if FailureSignalHandler is installed.
++bool IsFailureSignalHandlerInstalled();
+ }  // namespace glog_internal_namespace_
+ 
+ #define GOOGLE_GLOG_COMPILE_ASSERT(expr, msg) \
+@@ -1151,6 +1171,8 @@ public:
+     char* str() const { return pbase(); }
+ 
+   private:
++    LogStream(const LogStream&);
++    LogStream& operator=(const LogStream&);
+     base_logging::LogStreamBuf streambuf_;
+     int ctr_;  // Counter hack (for the LOG_EVERY_X() macro)
+     LogStream *self_;  // Consistency check hack
+@@ -1218,7 +1240,7 @@ public:
+   void SendToSyslogAndLog();  // Actually dispatch to syslog and the logs
+ 
+   // Call abort() or similar to perform LOG(FATAL) crash.
+-  static void Fail() @ac_cv___attribute___noreturn@;
++  static void @ac_cv___attribute___noreturn@ Fail();
+ 
+   std::ostream& stream();
+ 
+@@ -1266,7 +1288,7 @@ class GOOGLE_GLOG_DLL_DECL LogMessageFatal : public LogMessage {
+  public:
+   LogMessageFatal(const char* file, int line);
+   LogMessageFatal(const char* file, int line, const CheckOpString& result);
+-  ~LogMessageFatal() @ac_cv___attribute___noreturn@;
++  @ac_cv___attribute___noreturn@ ~LogMessageFatal();
+ };
+ 
+ // A non-macro interface to the log facility; (useful
+@@ -1570,7 +1592,7 @@ class GOOGLE_GLOG_DLL_DECL NullStreamFatal : public NullStream {
+   NullStreamFatal() { }
+   NullStreamFatal(const char* file, int line, const CheckOpString& result) :
+       NullStream(file, line, result) { }
+-  @ac_cv___attribute___noreturn@ ~NullStreamFatal() { _exit(1); }
++  @ac_cv___attribute___noreturn@ ~NullStreamFatal() throw () { _exit(1); }
+ };
+ 
+ // Install a signal handler that will dump signal information and a stack
+diff --git a/src/googletest.h b/src/googletest.h
+index 2525bc3..b4677b2 100644
+--- a/src/googletest.h
++++ b/src/googletest.h
+@@ -81,7 +81,7 @@ static inline string GetTempDir() {
+ #endif
+ }
+ 
+-#if defined(OS_WINDOWS) && defined(_MSC_VER)
++#if defined(OS_WINDOWS) && defined(_MSC_VER) && !defined(TEST_SRC_DIR)
+ // The test will run in glog/vsproject/<project name>
+ // (e.g., glog/vsproject/logging_unittest).
+ static const char TEST_SRC_DIR[] = "../..";
+diff --git a/src/logging.cc b/src/logging.cc
+index f1f519a..0b5e6ee 100644
+--- a/src/logging.cc
++++ b/src/logging.cc
+@@ -88,6 +88,10 @@ using std::perror;
+ using std::fdopen;
+ #endif
+ 
++#ifdef _WIN32
++#define fdopen _fdopen
++#endif
++
+ // There is no thread annotation support.
+ #define EXCLUSIVE_LOCKS_REQUIRED(mu)
+ 
+@@ -161,6 +165,8 @@ static const char* DefaultLogDir() {
+   return "";
+ }
+ 
++GLOG_DEFINE_int32(logfile_mode, 0664, "Log file mode/permissions.");
++
+ GLOG_DEFINE_string(log_dir, DefaultLogDir(),
+                    "If specified, logfiles are written into this directory instead "
+                    "of the default logging directory.");
+@@ -253,6 +259,7 @@ static bool TerminalSupportsColor() {
+       !strcmp(term, "xterm") ||
+       !strcmp(term, "xterm-color") ||
+       !strcmp(term, "xterm-256color") ||
++      !strcmp(term, "screen-256color") ||
+       !strcmp(term, "screen") ||
+       !strcmp(term, "linux") ||
+       !strcmp(term, "cygwin");
+@@ -569,7 +576,7 @@ inline void LogDestination::FlushLogFilesUnsafe(int min_severity) {
+   // assume we have the log_mutex or we simply don't care
+   // about it
+   for (int i = min_severity; i < NUM_SEVERITIES; i++) {
+-    LogDestination* log = log_destination(i);
++    LogDestination* log = log_destinations_[i];
+     if (log != NULL) {
+       // Flush the base fileobject_ logger directly instead of going
+       // through any wrappers to reduce chance of deadlock.
+@@ -816,6 +823,9 @@ void LogDestination::DeleteLogDestinations() {
+     delete log_destinations_[severity];
+     log_destinations_[severity] = NULL;
+   }
++  MutexLock l(&sink_mutex_);
++  delete sinks_;
++  sinks_ = NULL;
+ }
+ 
+ namespace {
+@@ -896,7 +906,7 @@ bool LogFileObject::CreateLogfile(const string& time_pid_string) {
+   string string_filename = base_filename_+filename_extension_+
+                            time_pid_string;
+   const char* filename = string_filename.c_str();
+-  int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0664);
++  int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, FLAGS_logfile_mode);
+   if (fd == -1) return false;
+ #ifdef HAVE_FCNTL
+   // Mark the file close-on-exec. We don't really care if this fails
+@@ -1459,7 +1469,7 @@ static void logging_fail() {
+ #if defined(_DEBUG) && defined(_MSC_VER)
+   // When debugging on windows, avoid the obnoxious dialog and make
+   // it possible to continue past a LOG(FATAL) in the debugger
+-  _asm int 3
++  __debugbreak();
+ #else
+   abort();
+ #endif
+diff --git a/src/logging_unittest.cc b/src/logging_unittest.cc
+index fa6afce..b886222 100644
+--- a/src/logging_unittest.cc
++++ b/src/logging_unittest.cc
+@@ -61,6 +61,7 @@ DECLARE_string(log_backtrace_at);  // logging.cc
+ 
+ #ifdef HAVE_LIB_GFLAGS
+ #include <gflags/gflags.h>
++using namespace GFLAGS_NAMESPACE;
+ #endif
+ 
+ #ifdef HAVE_LIB_GMOCK
+@@ -627,14 +628,15 @@ static void GetFiles(const string& pattern, vector<string>* files) {
+     LOG(FATAL) << "No directory separator.";
+   }
+   const string dirname = pattern.substr(0, index + 1);
+-  if (FAILED(handle)) {
++  if (handle == INVALID_HANDLE_VALUE) {
+     // Finding no files is OK.
+     return;
+   }
+   do {
+     files->push_back(dirname + data.cFileName);
+   } while (FindNextFileA(handle, &data));
+-  LOG_SYSRESULT(FindClose(handle));
++  BOOL result = FindClose(handle);
++  LOG_SYSRESULT(result);
+ #else
+ # error There is no way to do glob.
+ #endif
+diff --git a/src/mock-log.h b/src/mock-log.h
+index 5b21811..30a0f74 100644
+--- a/src/mock-log.h
++++ b/src/mock-log.h
+@@ -115,7 +115,8 @@ class ScopedMockLog : public GOOGLE_NAMESPACE::LogSink {
+   // WaitTillSent() and Log() are executed in the same thread.
+   virtual void send(GOOGLE_NAMESPACE::LogSeverity severity,
+                     const char* full_filename,
+-                    const char* base_filename, int line, const tm* tm_time,
++                    const char* /*base_filename*/, int /*line*/,
++                    const tm* /*tm_time*/,
+                     const char* message, size_t message_len) {
+     // We are only interested in the log severity, full file name, and
+     // log message.
+diff --git a/src/signalhandler.cc b/src/signalhandler.cc
+index cccd800..a7aef8b 100644
+--- a/src/signalhandler.cc
++++ b/src/signalhandler.cc
+@@ -335,6 +335,22 @@ void FailureSignalHandler(int signal_number,
+ 
+ #endif  // HAVE_SIGACTION
+ 
++namespace glog_internal_namespace_ {
++
++bool IsFailureSignalHandlerInstalled() {
++#ifdef HAVE_SIGACTION
++  struct sigaction sig_action;
++  memset(&sig_action, 0, sizeof(sig_action));
++  sigemptyset(&sig_action.sa_mask);
++  sigaction(SIGABRT, NULL, &sig_action);
++  if (sig_action.sa_sigaction == &FailureSignalHandler)
++    return true;
++#endif  // HAVE_SIGACTION
++  return false;
++}
++
++}  // namespace glog_internal_namespace_
++
+ void InstallFailureSignalHandler() {
+ #ifdef HAVE_SIGACTION
+   // Build the sigaction struct.
+diff --git a/src/signalhandler_unittest.cc b/src/signalhandler_unittest.cc
+index 1cd0fa0..59be231 100644
+--- a/src/signalhandler_unittest.cc
++++ b/src/signalhandler_unittest.cc
+@@ -41,6 +41,11 @@
+ #include <string>
+ #include "glog/logging.h"
+ 
++#ifdef HAVE_LIB_GFLAGS
++#include <gflags/gflags.h>
++using namespace GFLAGS_NAMESPACE;
++#endif
++
+ using namespace GOOGLE_NAMESPACE;
+ 
+ void* DieInThread(void*) {
+diff --git a/src/stacktrace_powerpc-inl.h b/src/stacktrace_powerpc-inl.h
+index 1090dde..03b9108 100644
+--- a/src/stacktrace_powerpc-inl.h
++++ b/src/stacktrace_powerpc-inl.h
+@@ -111,7 +111,7 @@ int GetStackTrace(void** result, int max_depth, int skip_count) {
+       result[n++] = *(sp+2);
+ #elif defined(_CALL_SYSV)
+       result[n++] = *(sp+1);
+-#elif defined(__APPLE__) || (defined(__linux) && defined(__PPC64__))
++#elif defined(__APPLE__) || ((defined(__linux) || defined(__linux__)) && defined(__PPC64__))
+       // This check is in case the compiler doesn't define _CALL_AIX/etc.
+       result[n++] = *(sp+2);
+ #elif defined(__linux)
+diff --git a/src/stl_logging_unittest.cc b/src/stl_logging_unittest.cc
+index 20f23b3..89fd6a1 100644
+--- a/src/stl_logging_unittest.cc
++++ b/src/stl_logging_unittest.cc
+@@ -31,6 +31,7 @@
+ 
+ #ifdef HAVE_USING_OPERATOR
+ 
++#include <functional>
+ #include <iostream>
+ #include <map>
+ #include <ostream>
+@@ -41,11 +42,19 @@
+ // C++0x isn't enabled by default in GCC and libc++ does not have
+ // non-standard ext/* and tr1/unordered_*.
+ # if defined(_LIBCPP_VERSION)
++#  ifndef GLOG_STL_LOGGING_FOR_UNORDERED
+ #  define GLOG_STL_LOGGING_FOR_UNORDERED
++#  endif
+ # else
++#  ifndef GLOG_STL_LOGGING_FOR_EXT_HASH
+ #  define GLOG_STL_LOGGING_FOR_EXT_HASH
++#  endif
++#  ifndef GLOG_STL_LOGGING_FOR_EXT_SLIST
+ #  define GLOG_STL_LOGGING_FOR_EXT_SLIST
++#  endif
++#  ifndef GLOG_STL_LOGGING_FOR_TR1_UNORDERED
+ #  define GLOG_STL_LOGGING_FOR_TR1_UNORDERED
++#  endif
+ # endif
+ #endif
+ 
+diff --git a/src/symbolize.cc b/src/symbolize.cc
+index b25f747..f83c309 100644
+--- a/src/symbolize.cc
++++ b/src/symbolize.cc
+@@ -327,7 +327,7 @@ FindSymbol(uint64_t pc, const int fd, char *out, int out_size,
+ // false.
+ static bool GetSymbolFromObjectFile(const int fd, uint64_t pc,
+                                     char *out, int out_size,
+-                                    uint64_t map_start_address) {
++                                    uint64_t map_base_address) {
+   // Read the ELF header.
+   ElfW(Ehdr) elf_header;
+   if (!ReadFromOffsetExact(fd, &elf_header, sizeof(elf_header), 0)) {
+@@ -336,7 +336,28 @@ static bool GetSymbolFromObjectFile(const int fd, uint64_t pc,
+ 
+   uint64_t symbol_offset = 0;
+   if (elf_header.e_type == ET_DYN) {  // DSO needs offset adjustment.
+-    symbol_offset = map_start_address;
++    ElfW(Phdr) phdr;
++    // We need to find the PT_LOAD segment corresponding to the read-execute
++    // file mapping in order to correctly perform the offset adjustment.
++    for (unsigned i = 0; i != elf_header.e_phnum; ++i) {
++      if (!ReadFromOffsetExact(fd, &phdr, sizeof(phdr),
++                               elf_header.e_phoff + i * sizeof(phdr)))
++        return false;
++      if (phdr.p_type == PT_LOAD &&
++          (phdr.p_flags & (PF_R | PF_X)) == (PF_R | PF_X)) {
++        // Find the mapped address corresponding to virtual address zero. We do
++        // this by first adding p_offset. This gives us the mapped address of
++        // the start of the segment, or in other words the mapped address
++        // corresponding to the virtual address of the segment. (Note that this
++        // is distinct from the start address, as p_offset is not guaranteed to
++        // be page aligned.) We then subtract p_vaddr, which takes us to virtual
++        // address zero.
++        symbol_offset = map_base_address + phdr.p_offset - phdr.p_vaddr;
++        break;
++      }
++    }
++    if (symbol_offset == 0)
++      return false;
+   }
+ 
+   ElfW(Shdr) symtab, strtab;
+@@ -569,8 +590,8 @@ OpenObjectFileContainingPcAndGetStartAddress(uint64_t pc,
+       return -1;  // Malformed line.
+     }
+ 
+-    // Check flags.  We are only interested in "r-x" maps.
+-    if (memcmp(flags_start, "r-x", 3) != 0) {  // Not a "r-x" map.
++   // Check flags.  We are only interested in "r*x" maps.
++    if (flags_start[0] != 'r' || flags_start[2] != 'x') {
+       continue;  // We skip this map.
+     }
+     ++cursor;  // Skip ' '.
+@@ -782,7 +803,7 @@ static ATTRIBUTE_NOINLINE bool SymbolizeAndDemangle(void *pc, char *out,
+     }
+   }
+   if (!GetSymbolFromObjectFile(wrapped_object_fd.get(), pc0,
+-                               out, out_size, start_address)) {
++                               out, out_size, base_address)) {
+     return false;
+   }
+ 
+diff --git a/src/symbolize_unittest.cc b/src/symbolize_unittest.cc
+index f25909d..05cb8a1 100644
+--- a/src/symbolize_unittest.cc
++++ b/src/symbolize_unittest.cc
+@@ -41,6 +41,11 @@
+ #include "googletest.h"
+ #include "config.h"
+ 
++#ifdef HAVE_LIB_GFLAGS
++#include <gflags/gflags.h>
++using namespace GFLAGS_NAMESPACE;
++#endif
++
+ using namespace std;
+ using namespace GOOGLE_NAMESPACE;
+ 
+diff --git a/src/utilities.cc b/src/utilities.cc
+index f31c7c7..5c88e58 100644
+--- a/src/utilities.cc
++++ b/src/utilities.cc
+@@ -138,13 +138,15 @@ static void DumpStackTraceAndExit() {
+ 
+   // TOOD(hamaji): Use signal instead of sigaction?
+ #ifdef HAVE_SIGACTION
+-  // Set the default signal handler for SIGABRT, to avoid invoking our
+-  // own signal handler installed by InstallFailedSignalHandler().
+-  struct sigaction sig_action;
+-  memset(&sig_action, 0, sizeof(sig_action));
+-  sigemptyset(&sig_action.sa_mask);
+-  sig_action.sa_handler = SIG_DFL;
+-  sigaction(SIGABRT, &sig_action, NULL);
++  if (IsFailureSignalHandlerInstalled()) {
++    // Set the default signal handler for SIGABRT, to avoid invoking our
++    // own signal handler installed by InstallFailureSignalHandler().
++    struct sigaction sig_action;
++    memset(&sig_action, 0, sizeof(sig_action));
++    sigemptyset(&sig_action.sa_mask);
++    sig_action.sa_handler = SIG_DFL;
++    sigaction(SIGABRT, &sig_action, NULL);
++  }
+ #endif  // HAVE_SIGACTION
+ 
+   abort();
+diff --git a/src/utilities_unittest.cc b/src/utilities_unittest.cc
+index 7b79619..38e847d 100644
+--- a/src/utilities_unittest.cc
++++ b/src/utilities_unittest.cc
+@@ -28,11 +28,15 @@
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ //
+ // Author: Shinichiro Hamaji
+-
+ #include "utilities.h"
+ #include "googletest.h"
+ #include "glog/logging.h"
+ 
++#ifdef HAVE_LIB_GFLAGS
++#include <gflags/gflags.h>
++using namespace GFLAGS_NAMESPACE;
++#endif
++
+ using namespace GOOGLE_NAMESPACE;
+ 
+ TEST(utilities, sync_val_compare_and_swap) {
+diff --git a/src/vlog_is_on.cc b/src/vlog_is_on.cc
+index 8a79df5..4c95583 100644
+--- a/src/vlog_is_on.cc
++++ b/src/vlog_is_on.cc
+@@ -162,30 +162,32 @@ int SetVLOGLevel(const char* module_pattern, int log_level) {
+   int result = FLAGS_v;
+   int const pattern_len = strlen(module_pattern);
+   bool found = false;
+-  MutexLock l(&vmodule_lock);  // protect whole read-modify-write
+-  for (const VModuleInfo* info = vmodule_list;
+-       info != NULL; info = info->next) {
+-    if (info->module_pattern == module_pattern) {
+-      if (!found) {
++  {
++    MutexLock l(&vmodule_lock);  // protect whole read-modify-write
++    for (const VModuleInfo* info = vmodule_list;
++         info != NULL; info = info->next) {
++      if (info->module_pattern == module_pattern) {
++        if (!found) {
++          result = info->vlog_level;
++          found = true;
++        }
++        info->vlog_level = log_level;
++      } else if (!found  &&
++                 SafeFNMatch_(info->module_pattern.c_str(),
++                              info->module_pattern.size(),
++                              module_pattern, pattern_len)) {
+         result = info->vlog_level;
+         found = true;
+       }
++    }
++    if (!found) {
++      VModuleInfo* info = new VModuleInfo;
++      info->module_pattern = module_pattern;
+       info->vlog_level = log_level;
+-    } else if (!found  &&
+-               SafeFNMatch_(info->module_pattern.c_str(),
+-                            info->module_pattern.size(),
+-                            module_pattern, pattern_len)) {
+-      result = info->vlog_level;
+-      found = true;
++      info->next = vmodule_list;
++      vmodule_list = info;
+     }
+   }
+-  if (!found) {
+-    VModuleInfo* info = new VModuleInfo;
+-    info->module_pattern = module_pattern;
+-    info->vlog_level = log_level;
+-    info->next = vmodule_list;
+-    vmodule_list = info;
+-  }
+   RAW_VLOG(1, "Set VLOG level for \"%s\" to %d", module_pattern, log_level);
+   return result;
+ }
+diff --git a/src/windows/glog/logging.h b/src/windows/glog/logging.h
+index bab8c61..fe8043a 100755
+--- a/src/windows/glog/logging.h
++++ b/src/windows/glog/logging.h
+@@ -52,14 +52,6 @@
+ #endif
+ #include <vector>
+ 
+-// Annoying stuff for windows -- makes sure clients can import these functions
+-#ifndef GOOGLE_GLOG_DLL_DECL
+-# if defined(_WIN32) && !defined(__CYGWIN__)
+-#   define GOOGLE_GLOG_DLL_DECL  __declspec(dllimport)
+-# else
+-#   define GOOGLE_GLOG_DLL_DECL
+-# endif
+-#endif
+ #if defined(_MSC_VER)
+ #define GLOG_MSVC_PUSH_DISABLE_WARNING(n) __pragma(warning(push)) \
+                                      __pragma(warning(disable:n))
+@@ -69,6 +61,15 @@
+ #define GLOG_MSVC_POP_WARNING()
+ #endif
+ 
++// Annoying stuff for windows -- makes sure clients can import these functions
++#ifndef GOOGLE_GLOG_DLL_DECL
++# if defined(_WIN32) && !defined(__CYGWIN__)
++#   define GOOGLE_GLOG_DLL_DECL  __declspec(dllimport)
++# else
++#   define GOOGLE_GLOG_DLL_DECL
++# endif
++#endif
++
+ // We care a lot about number of bits things take up.  Unfortunately,
+ // systems define their bit-specific ints in a lot of different ways.
+ // We use our own way, and have a typedef to get there.
+@@ -133,15 +134,28 @@ typedef unsigned __int64 uint64;
+ #ifndef GOOGLE_PREDICT_BRANCH_NOT_TAKEN
+ #if 0
+ #define GOOGLE_PREDICT_BRANCH_NOT_TAKEN(x) (__builtin_expect(x, 0))
+-#define GOOGLE_PREDICT_FALSE(x) (__builtin_expect(x, 0))
+-#define GOOGLE_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
+ #else
+ #define GOOGLE_PREDICT_BRANCH_NOT_TAKEN(x) x
++#endif
++#endif
++
++#ifndef GOOGLE_PREDICT_FALSE
++#if 0
++#define GOOGLE_PREDICT_FALSE(x) (__builtin_expect(x, 0))
++#else
+ #define GOOGLE_PREDICT_FALSE(x) x
++#endif
++#endif
++
++#ifndef GOOGLE_PREDICT_TRUE
++#if 0
++#define GOOGLE_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
++#else
+ #define GOOGLE_PREDICT_TRUE(x) x
+ #endif
+ #endif
+ 
++
+ // Make a bunch of macros for logging.  The way to log things is to stream
+ // things to LOG(<a particular severity level>).  E.g.,
+ //
+@@ -351,6 +365,9 @@ DECLARE_int32(minloglevel);
+ // default logging directory.
+ DECLARE_string(log_dir);
+ 
++// Set the log file mode.
++DECLARE_int32(logfile_mode);
++
+ // Sets the path of the directory into which to put additional links
+ // to the log files.
+ DECLARE_string(log_link);
+@@ -546,7 +563,7 @@ class LogSink;  // defined below
+ //   vector<string> *outvec;
+ // The cast is to disambiguate NULL arguments.
+ #define LOG_STRING(severity, outvec) \
+-  LOG_TO_STRING_##severity(static_cast<vector<string>*>(outvec)).stream()
++  LOG_TO_STRING_##severity(static_cast<std::vector<std::string>*>(outvec)).stream()
+ 
+ #define LOG_IF(severity, condition) \
+   !(condition) ? (void) 0 : google::LogMessageVoidify() & LOG(severity)
+@@ -714,10 +731,10 @@ DEFINE_CHECK_OP_IMPL(Check_GT, > )
+ // to reduce the overhead of CHECK statments by 2x.
+ // Real DCHECK-heavy tests have seen 1.5x speedups.
+ 
+-// The meaning of "string" might be different between now and 
++// The meaning of "string" might be different between now and
+ // when this macro gets invoked (e.g., if someone is experimenting
+ // with other string implementations that get defined after this
+-// file is included).  Save the current meaning now and use it 
++// file is included).  Save the current meaning now and use it
+ // in the macro.
+ typedef std::string _Check_string;
+ #define CHECK_OP_LOG(name, op, val1, val2, log)                         \
+@@ -910,6 +927,9 @@ template <bool>
+ struct CompileAssert {
+ };
+ struct CrashReason;
++
++// Returns true if FailureSignalHandler is installed.
++bool IsFailureSignalHandlerInstalled();
+ }  // namespace glog_internal_namespace_
+ 
+ #define GOOGLE_GLOG_COMPILE_ASSERT(expr, msg) \
+@@ -1155,6 +1175,8 @@ public:
+     char* str() const { return pbase(); }
+ 
+   private:
++    LogStream(const LogStream&);
++    LogStream& operator=(const LogStream&);
+     base_logging::LogStreamBuf streambuf_;
+     int ctr_;  // Counter hack (for the LOG_EVERY_X() macro)
+     LogStream *self_;  // Consistency check hack
+@@ -1222,7 +1244,7 @@ public:
+   void SendToSyslogAndLog();  // Actually dispatch to syslog and the logs
+ 
+   // Call abort() or similar to perform LOG(FATAL) crash.
+-  static void Fail() ;
++  static void  Fail();
+ 
+   std::ostream& stream();
+ 
+@@ -1270,7 +1292,7 @@ class GOOGLE_GLOG_DLL_DECL LogMessageFatal : public LogMessage {
+  public:
+   LogMessageFatal(const char* file, int line);
+   LogMessageFatal(const char* file, int line, const CheckOpString& result);
+-  ~LogMessageFatal() ;
++   ~LogMessageFatal();
+ };
+ 
+ // A non-macro interface to the log facility; (useful
+@@ -1574,7 +1596,7 @@ class GOOGLE_GLOG_DLL_DECL NullStreamFatal : public NullStream {
+   NullStreamFatal() { }
+   NullStreamFatal(const char* file, int line, const CheckOpString& result) :
+       NullStream(file, line, result) { }
+-   ~NullStreamFatal() { _exit(1); }
++   ~NullStreamFatal() throw () { _exit(1); }
+ };
+ 
+ // Install a signal handler that will dump signal information and a stack
+diff --git a/src/windows/port.cc b/src/windows/port.cc
+index bfa6e70..d994325 100755
+--- a/src/windows/port.cc
++++ b/src/windows/port.cc
+@@ -55,6 +55,7 @@ int safe_vsnprintf(char *str, size_t size, const char *format, va_list ap) {
+   return _vsnprintf(str, size-1, format, ap);
+ }
+ 
++#ifndef HAVE_SNPRINTF
+ int snprintf(char *str, size_t size, const char *format, ...) {
+   va_list ap;
+   va_start(ap, format);
+@@ -62,3 +63,4 @@ int snprintf(char *str, size_t size, const char *format, ...) {
+   va_end(ap);
+   return r;
+ }
++#endif
+diff --git a/src/windows/port.h b/src/windows/port.h
+index 24d7677..8198461 100755
+--- a/src/windows/port.h
++++ b/src/windows/port.h
+@@ -111,12 +111,16 @@ enum { STDIN_FILENO = 0, STDOUT_FILENO = 1, STDERR_FILENO = 2 };
+  * because they don't always NUL-terminate. :-(  We also can't use the
+  * name vsnprintf, since windows defines that (but not snprintf (!)).
+  */
+-extern int snprintf(char *str, size_t size,
++#ifndef HAVE_SNPRINTF
++extern int GOOGLE_GLOG_DLL_DECL snprintf(char *str, size_t size,
+                                        const char *format, ...);
+-extern int safe_vsnprintf(char *str, size_t size,
++#endif
++extern int GOOGLE_GLOG_DLL_DECL safe_vsnprintf(char *str, size_t size,
+                           const char *format, va_list ap);
+ #define vsnprintf(str, size, format, ap)  safe_vsnprintf(str, size, format, ap)
++#ifndef va_copy
+ #define va_copy(dst, src)  (dst) = (src)
++#endif
+ 
+ /* Windows doesn't support specifying the number of buckets as a
+  * hash_map constructor arg, so we leave this blank.
+@@ -132,6 +136,7 @@ typedef int pid_t;
+ #endif  // _MSC_VER
+ 
+ // ----------------------------------- THREADS
++#ifndef __MINGW32__
+ typedef DWORD pthread_t;
+ typedef DWORD pthread_key_t;
+ typedef LONG pthread_once_t;
+@@ -143,6 +148,7 @@ inline struct tm* localtime_r(const time_t* timep, struct tm* result) {
+   localtime_s(result, timep);
+   return result;
+ }
++#endif
+ 
+ inline char* strerror_r(int errnum, char* buf, size_t buflen) {
+   strerror_s(buf, buflen, errnum);

@@ -3,3 +3,4 @@
 meta.yaml text eol=lf
 build.sh text eol=lf
 bld.bat text eol=crlf
+glog_b6a5e0524c28178985f0d228e9eaa43808dbec3c.patch text eol=lf
