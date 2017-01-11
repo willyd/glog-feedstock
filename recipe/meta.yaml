@@ -24,6 +24,8 @@ requirements:
     - libtool   # [not win]
     - cmake     # [win]
     - gflags    # [win]
+  run:
+    - gflags    # [win]
 
 test:
   commands:
